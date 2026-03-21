@@ -195,6 +195,57 @@ def generate_dashboard(results: list[dict], fg_data: dict, output_path: str):
     print(f"\n📊 Dashboard data saved → {output_path}")
 
 
+def generate_curated(signalhub_public_path: str):
+    """Generate curated.json for SignalHub from config watchlist + sectors."""
+    from src.config import WATCHLIST, SECTORS
+
+    # Map sector keys to labels + emojis
+    sector_meta = {
+        "perp":       {"label": "Perps",       "emoji": "📊"},
+        "ai":         {"label": "AI",          "emoji": "🧠"},
+        "rwa":        {"label": "RWA",         "emoji": "🏦"},
+        "dex":        {"label": "DEX",         "emoji": "🔄"},
+        "stablecoin": {"label": "Stablecoins", "emoji": "💵"},
+        "yield":      {"label": "Yield",       "emoji": "🌾"},
+        "l1":         {"label": "L1s",         "emoji": "⛓️"},
+        "ai-social":  {"label": "AI Social",   "emoji": "🤖"},
+        "l2":         {"label": "L2s",         "emoji": "📦"},
+        "restaking":  {"label": "Restaking",   "emoji": "🔒"},
+        "depin-ai":   {"label": "DePIN/AI",    "emoji": "📡"},
+    }
+
+    watchlist = [
+        {"id": cid, "symbol": sym, "sector": cat, "thesis": note}
+        for cid, sym, cat, note in WATCHLIST
+    ]
+
+    data = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "watchlist": watchlist,
+        "sectors": sector_meta,
+    }
+
+    os.makedirs(os.path.dirname(signalhub_public_path), exist_ok=True)
+    with open(signalhub_public_path, "w") as f:
+        json.dump(data, f, indent=2)
+    print(f"\n🎯 Curated watchlist saved → {signalhub_public_path}")
+
+
+def generate_analysis(results: list[dict], output_path: str):
+    """Run AI agent analysis and save to JSON."""
+    try:
+        from src.agent import generate_analysis as agent_analyze
+    except ImportError:
+        print("⚠️  Agent module not found. Skipping AI analysis.")
+        return
+
+    scan_data = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "projects": results,
+    }
+    agent_analyze(scan_data, output_path)
+
+
 def main():
     parser = argparse.ArgumentParser(description="MoltStreet Intelligence v3.0")
     parser.add_argument("--top", type=int, default=20, help="Number of results to show")
@@ -202,6 +253,9 @@ def main():
     parser.add_argument("--email", action="store_true", help="Send email alerts for high signals")
     parser.add_argument("--json", action="store_true", help="Output raw JSON")
     parser.add_argument("--dashboard", action="store_true", help="Generate dashboard data.json")
+    parser.add_argument("--curated", action="store_true", help="Generate curated.json for SignalHub")
+    parser.add_argument("--agent", action="store_true", help="Run AI analysis agent")
+    parser.add_argument("--signalhub", type=str, help="Path to SignalHub public/ dir (for --curated)")
     parser.add_argument("--min-tvl", type=float, default=0, help="Min TVL filter")
     args = parser.parse_args()
 
@@ -226,12 +280,22 @@ def main():
     if args.email:
         send_email_alert(results, fg_data)
 
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
     if args.dashboard:
-        dashboard_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "dashboard", "data.json"
-        )
+        dashboard_path = os.path.join(base, "dashboard", "data.json")
         generate_dashboard(results, fg_data, dashboard_path)
+
+    if args.curated:
+        # Default: sibling signalhub/public/ directory
+        signalhub_path = args.signalhub or os.path.join(
+            os.path.dirname(base), "signalhub", "public", "curated.json"
+        )
+        generate_curated(signalhub_path)
+
+    if args.agent:
+        analysis_path = os.path.join(base, "dashboard", "analysis.json")
+        generate_analysis(results, analysis_path)
 
 
 if __name__ == "__main__":
