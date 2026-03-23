@@ -4,6 +4,59 @@
 
 Combines the best of `moltstreet-tools` and `crypto-early-radar` into a single, production-ready scanner.
 
+## 🚀 Come farlo partire (passo-passo)
+
+### Prerequisiti
+- **Python 3.10+** ([download](https://python.org))
+- **Git**
+
+### Passo 1: Clona il repository
+```bash
+git clone https://github.com/Lolarok/moltstreet-intelligence.git
+cd moltstreet-intelligence
+```
+
+### Passo 2: (Opzionale) GitHub token per rate limits migliori
+```bash
+export GITHUB_TOKEN=your_github_pat
+```
+Senza token: 60 richieste/ora. Con token: 5,000/ora.
+
+### Passo 3: Esegui lo scanner
+```bash
+# Scan base
+python3 src/main.py
+
+# Top 10 con dashboard HTML
+python3 src/main.py --top 10 --dashboard
+
+# Filtra per settore
+python3 src/main.py --sector ai
+
+# Output JSON
+python3 src/main.py --json
+```
+
+### Passo 4: Apri la dashboard
+```bash
+# Dopo aver generato i dati con --dashboard
+open dashboard/index.html
+# Mac: open dashboard/index.html
+# Windows: start dashboard/index.html
+# Linux: xdg-open dashboard/index.html
+```
+
+### Passo 5: Email alerts (opzionale)
+```bash
+export MAIL_APPPASSWORD=your_gmail_app_password
+python3 src/main.py --email
+```
+
+### Nessuna dipendenza da installare!
+Tutto usa Python stdlib + API gratuite. Zero pip install.
+
+---
+
 ## What It Does
 
 Every day, the scanner:
