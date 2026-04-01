@@ -35,16 +35,17 @@ SECTORS = {
 
 # ── Scoring Weights (must sum to 1.0) ─────────────────────────────────────
 WEIGHTS = {
-    "momentum_24h":    0.10,
-    "momentum_7d":     0.15,
-    "momentum_30d":    0.10,
-    "ath_discount":    0.15,
-    "volume_mcap":     0.10,
+    "momentum_24h":    0.08,
+    "momentum_7d":     0.12,
+    "momentum_30d":    0.08,
+    "ath_discount":    0.12,
+    "volume_mcap":     0.08,
     "tvl_level":       0.05,
-    "tvl_change_7d":   0.10,
+    "tvl_change_7d":   0.08,
     "fear_greed":      0.05,
-    "github_activity": 0.10,
-    "mcap_upside":     0.10,
+    "github_activity": 0.09,
+    "mcap_upside":     0.08,
+    "social":          0.17,  # Reddit engagement + sentiment
 }
 
 # ── Thresholds ─────────────────────────────────────────────────────────────

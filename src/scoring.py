@@ -134,8 +134,20 @@ def score_mcap_upside(mcap: float) -> float:
     return 10
 
 
+def score_social(social_data: dict | None) -> float:
+    """Score social signals (Reddit engagement + sentiment). Range: 0-100.
+    Uses composite social_score from the social source module.
+    """
+    if not social_data or social_data.get("total_threads", 0) == 0:
+        return 30  # No social data = neutral-low (might be a hidden gem)
+
+    ss = social_data.get("social_score", 0)
+    # Normalize: social_score is already 0-100
+    return clamp(ss, 0, 100)
+
+
 def compute_score(coin_data: dict, tvl_info: dict, gh_data: dict | None,
-                  fg_value: int | None) -> tuple[float, dict]:
+                  fg_value: int | None, social_data: dict | None = None) -> tuple[float, dict]:
     """Compute composite score for a coin.
     Returns (score_0_100, breakdown_dict).
     """
@@ -163,6 +175,7 @@ def compute_score(coin_data: dict, tvl_info: dict, gh_data: dict | None,
         "fear_greed":      score_fear_greed(fg_value),
         "github_activity": score_github_activity(gh_commits, gh_stars),
         "mcap_upside":     score_mcap_upside(mcap),
+        "social":          score_social(social_data),
     }
 
     # Weighted composite

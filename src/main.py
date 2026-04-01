@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MoltStreet Intelligence v3.0
+MoltStreet Intelligence v3.1
 Unified crypto scanner — all signals, one tool.
 
 Usage:
@@ -11,8 +11,9 @@ Usage:
     python3 main.py --json                   # JSON output
     python3 main.py --dashboard              # Generate dashboard data.json
     python3 main.py --min-tvl 1000000        # Min TVL filter (for sector scans)
+    python3 main.py --no-social              # Skip Reddit social scan (faster)
 
-Data: CoinGecko + DeFiLlama + GitHub + Fear & Greed
+Data: CoinGecko + DeFiLlama + GitHub + Fear & Greed + Reddit Social
 Cost: $0/month (GitHub Actions free tier)
 """
 import sys
@@ -32,6 +33,7 @@ from src.config import (
 from src.sources.coingecko import get_coin_data, get_trending, get_global_fear_greed
 from src.sources.defillama import get_tvl_data, get_dex_volumes, get_perp_volumes
 from src.sources.github import get_all_github_activity
+from src.sources.social import get_social_batch
 from src.scoring import compute_score, rating
 from src.alerts import send_email_alert
 
@@ -50,10 +52,10 @@ def cpct(p: float) -> str:
     return f"{s}{'+' if p > 0 else ''}{p:.1f}%"
 
 
-def run_scan(sector: str = None, min_tvl: float = 0, top: int = 20) -> list[dict]:
+def run_scan(sector: str = None, min_tvl: float = 0, top: int = 20, social: bool = True) -> list[dict]:
     """Run the full scan pipeline. Returns scored results."""
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    print(f"\n⚡ MoltStreet Intelligence v3.0 — {now}\n")
+    print(f"\n⚡ MoltStreet Intelligence v3.1 — {now}\n")
 
     # ── Step 1: Fetch all data sources ────────────────────────────────
     print("[1/5] CoinGecko prices...")
@@ -93,6 +95,21 @@ def run_scan(sector: str = None, min_tvl: float = 0, top: int = 20) -> list[dict
     trending = get_trending()
     print(f"  {len(trending)} trending terms\n")
 
+    # ── Step 2b: Social signals (Reddit) ─────────────────────────────
+    social_data = {}
+    if social:
+        print("[5b] Reddit social signals...")
+        symbol_list = [w[1] for w in watchlist]
+        name_map = {}
+        for cg_id, symbol, category, note in watchlist:
+            cd = coin_data.get(cg_id)
+            if cd:
+                name_map[symbol] = cd.get("name", "")
+        social_data = get_social_batch(symbol_list, name_map=name_map, delay=0.5)
+        print(f"  Got social data for {len(social_data)} coins\n")
+    else:
+        print("[5b] Social scan skipped (--no-social)\n")
+
     # ── Step 2: Score everything ──────────────────────────────────────
     results = []
     for cg_id, symbol, category, note in watchlist:
@@ -104,8 +121,9 @@ def run_scan(sector: str = None, min_tvl: float = 0, top: int = 20) -> list[dict
         sym_upper = symbol.upper()
         tvl_info = tvl_data.get(sym_upper, {})
         gh_info = gh_data.get(sym_upper)
+        soc_info = social_data.get(sym_upper)
 
-        score, breakdown = compute_score(cd, tvl_info, gh_info, fg_value)
+        score, breakdown = compute_score(cd, tvl_info, gh_info, fg_value, soc_info)
 
         # Build signals list (human-readable reasons)
         signals = []
@@ -127,6 +145,13 @@ def run_scan(sector: str = None, min_tvl: float = 0, top: int = 20) -> list[dict
         if tvl_chg > 15: signals.append(f"TVL+{tvl_chg:.0f}%/7d")
         if gh_info and gh_info.get("commits_4w", 0) > 50: signals.append(f"GH:{gh_info['commits_4w']}commits/4w")
 
+        # Social signals
+        if soc_info and soc_info.get("total_threads", 0) > 0:
+            if soc_info["total_threads"] > 15: signals.append(f"Reddit:{soc_info['total_threads']}threads")
+            if soc_info["total_score"] > 500: signals.append(f"Reddit:{soc_info['total_score']}upvotes")
+            if soc_info.get("sentiment_signal", 50) > 85: signals.append("Reddit:bullish")
+            if soc_info.get("sentiment_signal", 50) < 50: signals.append("Reddit:bearish")
+
         results.append({
             "symbol": symbol,
             "category": category,
@@ -144,6 +169,7 @@ def run_scan(sector: str = None, min_tvl: float = 0, top: int = 20) -> list[dict
             "volume": vol,
             "tvl": tvl,
             "tvl_change_7d": tvl_chg,
+            "social": soc_info,
         })
 
     results.sort(key=lambda x: x["score"], reverse=True)
@@ -186,6 +212,14 @@ def generate_dashboard(results: list[dict], fg_data: dict, output_path: str):
                 "tvl": r["tvl"],
                 "breakdown": r["breakdown"],
                 "signals": r["signals"],
+                "social": {
+                    "threads": r.get("social", {}).get("total_threads", 0),
+                    "upvotes": r.get("social", {}).get("total_score", 0),
+                    "comments": r.get("social", {}).get("total_comments", 0),
+                    "sentiment": r.get("social", {}).get("sentiment_signal", 0),
+                    "score": r.get("social", {}).get("social_score", 0),
+                    "top_threads": r.get("social", {}).get("top_threads", [])[:3],
+                } if r.get("social") else None,
             }
             for r in results
         ],
@@ -247,7 +281,7 @@ def generate_analysis(results: list[dict], output_path: str):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="MoltStreet Intelligence v3.0")
+    parser = argparse.ArgumentParser(description="MoltStreet Intelligence v3.1")
     parser.add_argument("--top", type=int, default=20, help="Number of results to show")
     parser.add_argument("--sector", type=str, choices=list(SECTORS.keys()), help="Filter by sector")
     parser.add_argument("--email", action="store_true", help="Send email alerts for high signals")
@@ -257,9 +291,10 @@ def main():
     parser.add_argument("--agent", action="store_true", help="Run AI analysis agent")
     parser.add_argument("--signalhub", type=str, help="Path to SignalHub public/ dir (for --curated)")
     parser.add_argument("--min-tvl", type=float, default=0, help="Min TVL filter")
+    parser.add_argument("--no-social", action="store_true", help="Skip Reddit social scan (faster)")
     args = parser.parse_args()
 
-    results = run_scan(sector=args.sector, min_tvl=args.min_tvl, top=args.top)
+    results = run_scan(sector=args.sector, min_tvl=args.min_tvl, top=args.top, social=not args.no_social)
 
     if args.json:
         print(json.dumps(results[:args.top], indent=2))

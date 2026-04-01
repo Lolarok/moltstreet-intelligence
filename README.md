@@ -1,8 +1,8 @@
-# MoltStreet Intelligence v3.0
+# MoltStreet Intelligence v3.1
 
 **Unified crypto scanner — all signals, one tool.**
 
-Combines the best of `moltstreet-tools` and `crypto-early-radar` into a single, production-ready scanner.
+Combines market data, on-chain metrics, developer activity, and **Reddit community sentiment** into a single, production-ready scanner.
 
 ## 🚀 Come farlo partire (passo-passo)
 
@@ -24,10 +24,10 @@ Senza token: 60 richieste/ora. Con token: 5,000/ora.
 
 ### Passo 3: Esegui lo scanner
 ```bash
-# Scan base
+# Scan base (includi social Reddit)
 python3 src/main.py
 
-# Top 10 con dashboard HTML
+# Top 10 con dashboard
 python3 src/main.py --top 10 --dashboard
 
 # Filtra per settore
@@ -35,15 +35,15 @@ python3 src/main.py --sector ai
 
 # Output JSON
 python3 src/main.py --json
+
+# Scan veloce (skip Reddit)
+python3 src/main.py --no-social
 ```
 
 ### Passo 4: Apri la dashboard
 ```bash
 # Dopo aver generato i dati con --dashboard
 open dashboard/index.html
-# Mac: open dashboard/index.html
-# Windows: start dashboard/index.html
-# Linux: xdg-open dashboard/index.html
 ```
 
 ### Passo 5: Email alerts (opzionale)
@@ -64,42 +64,41 @@ Every day, the scanner:
 2. Fetches TVL + DEX/perp volumes from **DeFiLlama** (free API)
 3. Checks **Fear & Greed** index (contrarian signal)
 4. Measures **GitHub activity** (dev commits + stars)
-5. Detects **trending coins** on CoinGecko
-6. Scores each project 0-100 with a weighted multi-factor model
-7. Generates a **live dashboard** + **email alerts**
+5. Searches **Reddit** for community sentiment & engagement
+6. Detects **trending coins** on CoinGecko
+7. Scores each project 0-100 with a weighted multi-factor model
+8. Generates a **live dashboard** + **email alerts**
 
 ## Signals
 
 | Signal | Weight | What It Measures |
 |--------|--------|-----------------|
-| 24h Momentum | 10% | Short-term price direction |
-| 7d Momentum | 15% | Near-term trend |
-| 30d Momentum | 10% | Sustained movement |
-| ATH Discount | 15% | Value vs all-time high (contrarian) |
-| Volume/MCap | 10% | Genuine trading interest |
+| 24h Momentum | 8% | Short-term price direction |
+| 7d Momentum | 12% | Near-term trend |
+| 30d Momentum | 8% | Sustained movement |
+| ATH Discount | 12% | Value vs all-time high (contrarian) |
+| Volume/MCap | 8% | Genuine trading interest |
 | TVL Level | 5% | DeFi capital deployed |
-| TVL Change 7d | 10% | DeFi growth momentum |
+| TVL Change 7d | 8% | DeFi growth momentum |
 | Fear & Greed | 5% | Market sentiment (contrarian) |
-| GitHub Activity | 10% | Developer health |
-| MCap Upside | 10% | Small cap = asymmetric returns |
+| GitHub Activity | 9% | Developer health |
+| MCap Upside | 8% | Small cap = asymmetric returns |
+| **Social (Reddit)** | **17%** | Community engagement + sentiment |
 
 **Ratings:** 78+ = STRONG BUY | 65+ = ALERT | 50+ = WATCH | <50 = HOLD
 
-## Quick Start
+## Social Signals (New in v3.1)
 
-```bash
-# Scan your watchlist
-python3 src/main.py
+Reddit community data is now a first-class signal:
 
-# Top 10 with dashboard
-python3 src/main.py --top 10 --dashboard
+- **Engagement:** Thread upvotes, comment counts, discussion volume
+- **Sentiment:** Average upvote ratio (bullish vs bearish sentiment)
+- **Discovery:** Auto-searches coin-specific subreddits (r/solana, r/HyperliquidDEX, etc.)
+- **Scoring:** Log-scaled engagement + sentiment weighting (adapted from [last30days-skill](https://github.com/mvanhorn/last30days-skill))
 
-# Sector filter + email
-python3 src/main.py --sector ai --email
+Subreddits covered: r/CryptoCurrency, r/CryptoMarkets, r/altcoin, r/defi + coin-specific subs.
 
-# JSON output
-python3 src/main.py --json
-```
+No API keys required — uses Reddit's public JSON endpoint.
 
 ## Dashboard
 
@@ -111,19 +110,19 @@ python3 src/main.py --dashboard
 open dashboard/index.html
 ```
 
-The dashboard auto-refreshes from `dashboard/data.json`. Features:
-- Fear & Greed widget
-- Category filters (perps, L1s, L2s, DeFi, AI, RWA, etc.)
-- Sortable columns
-- Score breakdown per project
+The dashboard includes per-coin social data: thread count, upvotes, sentiment score, and top threads with links.
 
-## Automation (GitHub Actions)
+## Data Sources
 
-Runs daily at 07:00 UTC. Requires one secret:
+| Source | Data | Cost |
+|--------|------|------|
+| CoinGecko | Prices, markets, trending | Free |
+| DeFiLlama | TVL, DEX volumes, perp volumes | Free |
+| Alternative.me | Fear & Greed index | Free |
+| GitHub API | Commit activity, stars | Free |
+| Reddit | Community sentiment + engagement | Free (public JSON) |
 
-1. Go to **Settings > Secrets > Actions**
-2. Add `MAIL_APPPASSWORD` (Gmail app password for alerts)
-3. Push to GitHub — it runs automatically
+**Total cost: $0/month**
 
 ## Configuration
 
@@ -133,32 +132,7 @@ All settings in `src/config.py`:
 - **WEIGHTS** — scoring model weights (must sum to 1.0)
 - **SECTORS** — category filters
 - **GITHUB_REPOS** — protocol repos for activity tracking
-- **ALERT_THRESHOLD** / **WATCH_THRESHOLD** — score cutoffs
-
-## RSS Aggregator
-
-Separate tool for auto-posting to WordPress:
-
-```bash
-# Post to all sites
-python3 rss/aggregator.py
-
-# Dry run
-python3 rss/aggregator.py --dry-run --site crypto
-```
-
-Requires env vars: `WP_AI_URL`, `WP_AI_USER`, `WP_AI_PASSWORD` (per site).
-
-## Data Sources
-
-| Source | Data | Cost |
-|--------|------|------|
-| CoinGecko | Prices, markets, trending | Free (10-30 calls/min) |
-| DeFiLlama | TVL, DEX volumes, perp volumes | Free (unlimited) |
-| Alternative.me | Fear & Greed index | Free |
-| GitHub API | Commit activity, stars | Free (60/hr unauthenticated, 5000/hr with token) |
-
-**Total cost: $0/month**
+- **COIN_SUBREDDITS** (in `social.py`) — coin-specific subreddits
 
 ## Structure
 
@@ -170,32 +144,36 @@ moltstreet-intelligence/
 │   │   ├── coingecko.py   ← prices, markets, trending
 │   │   ├── defillama.py   ← TVL, DEX/perp volumes
 │   │   ├── github.py      ← commits + stars
-│   │   └── feargreed.py   ← Fear & Greed index
+│   │   ├── feargreed.py   ← Fear & Greed index
+│   │   └── social.py      ← Reddit sentiment [NEW]
 │   ├── scoring.py         ← weighted scoring engine
 │   ├── alerts.py          ← email alerts
 │   └── main.py            ← CLI orchestrator
 ├── dashboard/
 │   ├── index.html         ← live dashboard
 │   └── data.json          ← generated
-├── rss/
-│   └── aggregator.py      ← WordPress auto-poster
 ├── .github/workflows/
 │   └── scanner.yml        ← daily cron
 └── README.md
 ```
 
-## What Changed From v2
+## What Changed From v3.0
 
-- **Merged** moltstreet-tools + crypto-early-radar into one tool
-- **Added** Fear & Greed + GitHub activity signals
-- **Added** DEX + perp volume data (from alpha_hunter)
-- **Added** weighted scoring model (configurable)
-- **Added** sector filtering (perp, rwa, ai, l2, defi, infra, l1)
-- **Added** proper rate limiting + error handling
-- **Added** sortable, filterable dashboard
-- **Added** GitHub Actions daily cron
-- **Removed** hardcoded values (everything is in config.py)
+- **Added** Reddit social signals source (`src/sources/social.py`)
+- **Added** social signal scoring (17% weight in composite)
+- **Added** coin-specific subreddit search (r/solana, r/HyperliquidDEX, etc.)
+- **Added** `--no-social` flag for faster scans
+- **Added** social data to dashboard output (threads, upvotes, sentiment, top threads)
+- **Rebalanced** all weights to accommodate social signal (total still 1.0)
+- Multi-signal scoring architecture inspired by [last30days-skill](https://github.com/mvanhorn/last30days-skill)
 
 ---
 
-*Not financial advice. DYOR. MoltStreet Intelligence v3.0*
+*Not financial advice. DYOR. MoltStreet Intelligence v3.1*
+
+## Related Projects
+
+- [🧠 Guida AI 2026](https://lolarok.github.io/guida-ai-2026/) — I 10 Strumenti AI Più Interessanti del 2026
+- [signalhub](https://lolarok.github.io/signalhub/) — Live crypto dashboard
+- [crypto-trading-agents](https://github.com/Lolarok/crypto-trading-agents) — Multi-Agent LLM trading framework
+- [market-radar](https://github.com/Lolarok/market-radar) — Multi-source financial scanner
