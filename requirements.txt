@@ -1,0 +1,6 @@
+# Zero external dependencies for the scanner
+# Uses Python 3.11+ standard library only:
+#   urllib, json, smtplib, datetime, email, argparse, time, os, sys
+
+# RSS aggregator requires:
+requests>=2.28.0
