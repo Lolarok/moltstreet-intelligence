@@ -285,6 +285,7 @@ def main():
     parser.add_argument("--top", type=int, default=20, help="Number of results to show")
     parser.add_argument("--sector", type=str, choices=list(SECTORS.keys()), help="Filter by sector")
     parser.add_argument("--email", action="store_true", help="Send email alerts for high signals")
+    parser.add_argument("--telegram", action="store_true", help="Send Telegram alerts for high signals")
     parser.add_argument("--json", action="store_true", help="Output raw JSON")
     parser.add_argument("--jsonl", action="store_true", help="Output results as JSONL (one JSON object per line)")
     parser.add_argument("--dashboard", action="store_true", help="Generate dashboard data.json")
@@ -320,6 +321,13 @@ def main():
 
     if args.email:
         send_email_alert(results, fg_data)
+
+    if args.telegram:
+        try:
+            from src.alerts import send_telegram_alert
+            send_telegram_alert(results, fg_data)
+        except ImportError:
+            print("  [WARN] Telegram alert module not implemented yet.")
 
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 

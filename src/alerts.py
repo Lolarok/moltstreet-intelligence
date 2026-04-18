@@ -4,7 +4,9 @@ Email alerts + future: Discord/Telegram webhooks.
 """
 import os
 import smtplib
-from datetime import datetime, timezone
+import urllib.request
+import urllib.error
+import urllib.parse
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -84,4 +86,74 @@ def send_email_alert(results: list[dict], fg_data: dict) -> bool:
         return True
     except Exception as e:
         print(f"  ❌ Email error: {e}")
+        return False
+
+
+def send_telegram_alert(results: list[dict], fg_data: dict) -> bool:
+    """Send Telegram alert for high-signal results.
+    Returns True if sent successfully.
+    Requires TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID environment variables.
+    """
+    bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    if not bot_token or not chat_id:
+        print("  [INFO] Telegram credentials not set. Skipping Telegram alert.")
+        return False
+
+    from src.config import ALERT_THRESHOLD
+
+    alerts = [r for r in results if r["score"] >= ALERT_THRESHOLD]
+    if not alerts:
+        return False
+
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    fg_index = fg_data.get("index", "?")
+    fg_label = fg_data.get("label", "")
+
+    # Build message
+    message_lines = [
+        f"⚡ *MoltStreet Intelligence* — {len(alerts)} ALERT(S)",
+        f"🕒 {now}",
+        f"📊 Market Sentiment: F&G {fg_index} ({fg_label})",
+        "",
+    ]
+    for r in alerts[:10]:  # Limit to 10 to avoid huge messages
+        symbol = r["symbol"]
+        score = r["score"]
+        price = r["price"]
+        rating = r["rating"]
+        signals = ", ".join(r.get("signals", [])[:3])
+        line = f"• *{symbol}*: Score {score} | ${price:.4f} | {rating}"
+        if signals:
+            line += f" → {signals}"
+        message_lines.append(line)
+    if len(alerts) > 10:
+        message_lines.append(f"• ... and {len(alerts) - 10} more")
+    message_lines.append("")
+    message_lines.append("_Not financial advice. DYOR._")
+
+    message = "\n".join(message_lines)
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    data = urllib.parse.urlencode({
+        "chat_id": chat_id,
+        "text": message,
+        "parse_mode": "MarkdownV2",
+    }).encode("utf-8")
+
+    req = urllib.request.Request(url, data=data, method="POST")
+    req.add_header("Content-Type", "application/x-www-form-urlencoded")
+
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            if resp.status == 200:
+                print(f"  ✅ Telegram alert sent → chat {chat_id}")
+                return True
+            else:
+                print(f"  ❌ Telegram error: HTTP {resp.status}")
+                return False
+    except urllib.error.URLError as e:
+        print(f"  ❌ Telegram error: {e.reason}")
+        return False
+    except Exception as e:
+        print(f"  ❌ Telegram error: {e}")
         return False
