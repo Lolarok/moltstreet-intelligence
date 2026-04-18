@@ -286,6 +286,7 @@ def main():
     parser.add_argument("--sector", type=str, choices=list(SECTORS.keys()), help="Filter by sector")
     parser.add_argument("--email", action="store_true", help="Send email alerts for high signals")
     parser.add_argument("--json", action="store_true", help="Output raw JSON")
+    parser.add_argument("--jsonl", action="store_true", help="Output results as JSONL (one JSON object per line)")
     parser.add_argument("--dashboard", action="store_true", help="Generate dashboard data.json")
     parser.add_argument("--curated", action="store_true", help="Generate curated.json for SignalHub")
     parser.add_argument("--agent", action="store_true", help="Run AI analysis agent")
@@ -298,6 +299,11 @@ def main():
 
     if args.json:
         print(json.dumps(results[:args.top], indent=2))
+        return
+
+    if args.jsonl:
+        for r in results[:args.top]:
+            print(json.dumps(r))
         return
 
     print_results(results, top=args.top)
