@@ -47,6 +47,12 @@ open dashboard/index.html
 ```
 
 ### Passo 5: Email alerts (opzionale)
+### Passo 6: Telegram alerts (opzionale)
+```bash
+export TELEGRAM_BOT_TOKEN=your_token_here
+export TELEGRAM_CHAT_ID=your_chat_id
+python3 src/main.py --telegram
+```
 ```bash
 export MAIL_APPPASSWORD=your_gmail_app_password
 python3 src/main.py --email
